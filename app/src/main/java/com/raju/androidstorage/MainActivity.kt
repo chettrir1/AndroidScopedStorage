@@ -28,6 +28,7 @@ import java.util.UUID
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private lateinit var internalStoragePhotoAdapter: InternalStoragePhotoAdapter
+    private lateinit var externalStoragePhotoAdapter: SharedPhotoAdapter
     private var readPermissionGranted = false
     private var writePermissionGranted = false
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
@@ -45,18 +46,41 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        externalStoragePhotoAdapter = SharedPhotoAdapter {
+
+        }
+
+        permissionLauncher =
+            registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+                readPermissionGranted =
+                    permissions[Manifest.permission.READ_EXTERNAL_STORAGE] ?: readPermissionGranted
+                writePermissionGranted =
+                    permissions[Manifest.permission.WRITE_EXTERNAL_STORAGE]
+                        ?: writePermissionGranted
+            }
+
+        updateOrRequestPermission()
+
         val takePhoto =
             registerForActivityResult(ActivityResultContracts.TakePicturePreview()) {
                 val isPrivate = binding.switchPrivate.isChecked
+                val isSavedSuccessfully = when {
+                    isPrivate -> savePhotoToInternalStorage(UUID.randomUUID().toString(), it!!)
+                    writePermissionGranted -> savePhotoToExternalStorage(
+                        UUID.randomUUID().toString(), it!!
+                    )
+
+                    else -> false
+                }
+
                 if (isPrivate) {
-                    val isSavedSuccessfully =
-                        savePhotoToInternalStorage(UUID.randomUUID().toString(), it!!)
-                    if (isSavedSuccessfully) {
-                        loadPhotosFromInternalStorageIntoRecyclerView()
-                        Toast.makeText(this, "Photo saved successfully!", Toast.LENGTH_SHORT).show()
-                    } else {
-                        Toast.makeText(this, "Failed to save photo!", Toast.LENGTH_SHORT).show()
-                    }
+                    loadPhotosFromInternalStorageIntoRecyclerView()
+                }
+
+                if (isSavedSuccessfully) {
+                    Toast.makeText(this, "Photo saved successfully!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Failed to save photo!", Toast.LENGTH_SHORT).show()
                 }
             }
 
